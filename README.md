@@ -23,3 +23,6 @@ Directory-structure
     ├── multimodality		<- Scripts to determine if the data are unimodals
     ├── visualization		<- Scripts to explore and visualize the data
 ├── test
+
+
+test learning
