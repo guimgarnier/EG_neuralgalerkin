@@ -1,0 +1,7 @@
+{
+  "test_SolveLinSys.py::test_SolveLinSys": true,
+  "test_SolveLinSys.py::test_SolveLinSys_GS": true,
+  "test_SolveLinSys.py::test_SolveLinSys_J": true,
+  "test_ode.py": true,
+  "test_ode.py::test_ode": true
+}
