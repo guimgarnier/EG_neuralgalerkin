@@ -1,0 +1,17 @@
+# Ignore LaTex outputs
+*.pdf
+*.aux
+*.log
+*.gz
+*.bbl
+*.blg
+*.fdb_latexmk
+*.out
+*.fls
+
+# ignore caches
+src/__pycache__/*
+*.TAG
+*.ipynb_checkpoints
+*.cpython-38.pyc
+notebooks/__pycache__/*
