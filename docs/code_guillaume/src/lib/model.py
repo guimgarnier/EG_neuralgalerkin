@@ -1,12 +1,7 @@
-import torch as tc
 import warnings
-
-from torch.func import grad, vmap            # grad for functions
-from torch.autograd import grad as autograd  # grad for Tensors
-
-# torch.func.grad     acts on a function and returns a function
-# torch.autograd.grad acts on a Tensor and returns a Tensor
-
+import torch
+import torch as tc
+from torch.func import jacfwd, vmap, grad,jacrev
 
 class Model(tc.nn.Module):
     
@@ -30,13 +25,12 @@ class Model(tc.nn.Module):
         # Dictionary of models 
         methods = {
             'gaussian'        : self.gaussian_x,   # Eq. (16)
-            'simple_cos'      : self.scos_x,       
-            'nn'              : self.nn_x              # Eq. (17)
         }
 
         # Warning : une initialisation à ones fait échouer la minimisation pour theta0 !
+        self.Theta = tc.rand(self.s,requires_grad=True) #if theta is None else theta
         self.theta = tc.nn.Parameter(tc.rand(self.s) if theta is None else theta)
-        #self.theta = tc.nn.Parameter(2.0*tc.ones(self.s) if theta is None else theta) 
+         #self.theta = tc.nn.Parameter(2.0*tc.ones(self.s) if theta is None else theta) 
 
         # batched derivatives , input are (d,)
         self.eval_x    = methods[kind]
@@ -54,6 +48,11 @@ class Model(tc.nn.Module):
         b = self.theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
         w = self.theta[self.m+self.m*self.d:]
         return (c,b,w)
+    def splitter_gaussian1(self):
+        c = self.Theta[:self.m]
+        b = self.Theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
+        w = self.Theta[self.m+self.m*self.d:]
+        return (c,b,w)
     
     def splitter_nn(self):
         c = self.theta[:self.m]
@@ -61,58 +60,41 @@ class Model(tc.nn.Module):
         w=self.theta[self.m+self.d*self.l:].reshape(self.l,self.m,self.d)
         return (c,b,w)
     
-    
-    # All the model
-    # WARNING : do not use this functions on anything else than scalar points.
-    
-    def scos_x(self, x: tc.Tensor):
-        """        
-        Input :  a SCALAR x of shape (0,)
-        Output : a SCALAR
-        """
-        return tc.cos(x)
-    
     def gaussian_x(self, x: tc.Tensor):
-        """        
-        Input :  a SCALAR x of shape (0,)
-        Output : a SCALAR
-        """
+               
+       # Input :  a SCALAR x of shape (0,)
+       # Output : a SCALAR
+        
         c, b, w = self.splitter_gaussian()
-        #y=tc.sum(c*tc.exp(-w**2*(x-b).T**2))
+        return tc.sum(c*tc.exp(-w**2 *(x-b).T**2))  
+
+    
+    """
+    
+    def forward_t(self, theta, x):
+        self.theta = theta
+        c,b,w = self.splitter_gaussian()
+        diff = x.unsqueeze(2)-b.t().unsqueeze(0) # tensor with shape (npoints,d,m)
+        distance = torch.norm(diff, dim=1)**2 # tensor of dimension (npoints, m)
+        exp_factor = torch.exp(-w.unsqueeze(0)**2*distance)
+        return torch.sum(c.unsqueeze(0)*exp_factor, dim=1).unsqueeze(1) """
+    def forward_t(self, theta, x):
+        self.Theta = theta.clone()
+        c,b,w = self.splitter_gaussian1()
+        #vect=lambda x: (c*tc.exp(-w**2*(x-b)**2)).sum()
+        #return (c*tc.exp(-w**2*(x-b)**2)).sum()
         return tc.sum(c*tc.exp(-w**2*(x-b).T**2))
+    def grad_theta(self, theta, samples):
+        self.Theta = theta.clone()
+        jacobian=jacrev(self.forward_t,argnums=0)(self.Theta, samples)
+        return jacobian
+        
+    def out_prod(self,theta,x):
+        #self.Theta=theta.clone()
+        out_p=lambda theta,x_: tc.outer(self.grad_theta(theta,x_),self.grad_theta(theta,x_))
+        M=vmap((out_p),in_dims=(None,0))(theta,x).detach()
+        return tc.mean(M,dim=0)
     
-    def nn_x(self, x: tc.Tensor):
-        """        
-        Input :  a SCALAR x of shape (0,)
-        Output : a SCALAR
-        """
-        c, b, w = self.splitter_nn()
-        x = tc.tanh(w[0]* tc.sin(2*tc.pi*(x - b[0])/self.L))
-        for k in range(1,self.l):
-            x = tc.tanh(w[k] * x + b[k])
-        x = c.T @ x
-        return x[0]
-
-    
-if __name__ == '__main__':
-
-    d = 1000
-    m = 2
-    model = Model(d,m, kind='gaussian')
-
-    # For cos(x)
-    x = tc.Tensor([0.0, tc.pi/2.0, tc.pi])
-    x.requires_grad_(True)
-    U   = model(x)           # should return [1, 0, -1]
-    Ux  = model.dx(x)        # should return [0, -1, 0]    
-    Uxx = model.dxx(x)       # should return 
-    Uxxx= model.dxxx(x)      # should return     
-
-
-    # For gaussians :
-    # U   = model(x)           # should return [0.54, 4.0]
-    # Ux  = model.dx(x)        # should return [2.16, 0.0]    
-    # Uxx = model.dxx(x)       # should return [6.49, -16.0]
-    # Uxxx= model.dxxx(x)      # should return [8.66, 0.0]    
-    
-    
+    def __call__(self, x):
+        return self.forward(x)
+        

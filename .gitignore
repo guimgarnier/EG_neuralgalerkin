@@ -11,7 +11,9 @@
 
 # ignore caches
 src/__pycache__/*
+*.pyc
 *.TAG
 *.ipynb_checkpoints
 *.cpython-38.pyc
+*.cpython-39.pyc
 notebooks/__pycache__/*
