@@ -29,16 +29,16 @@ class Ansatz(tc.nn.Module):
             'gaussian'        : self.gaussian_x,
         }
 
-        self.Theta = tc.rand(self.s,requires_grad=True) #if theta is None else theta
+        self.Theta = tc.rand(self.s,requires_grad=True) if theta is None else theta 
         self.theta = tc.nn.Parameter(tc.rand(self.s) if theta is None else theta)
         
         self.eval_x    = methods[kind]
         self.forward   = vmap(self.eval_x)
         
     def splitter_gaussian(self):
-        c = self.theta[:self.m]
-        b = self.theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
-        w = self.theta[self.m+self.m*self.d:]
+        c = self.Theta[:self.m]
+        b = self.Theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
+        w = self.Theta[self.m+self.m*self.d:]
         return (c,b,w)
     
     def gaussian_x(self, x: tc.Tensor):
@@ -56,6 +56,23 @@ class Ansatz(tc.nn.Module):
         #vect=lambda x: (c*tc.exp(-w**2*(x-b)**2)).sum()
         #return (c*tc.exp(-w**2*(x-b)**2)).sum()
         return tc.sum(c*tc.exp(-w**2*(x-b).T**2))
+
+    def forward_t(self, theta, x):
+        self.Theta = theta.clone()
+        c,b,w = self.splitter_gaussian()
+        return tc.sum(c*tc.exp(-w**2*(x-b).T**2))
+
+    def grad_theta(self, theta, samples):
+        self.Theta = theta.clone()
+        jacobian=jacrev(self.forward_t,argnums=0)(self.Theta, samples)
+        return jacobian
+        
+    def out_prod(self,theta,x):
+        #self.Theta=theta.clone()
+        out_p=lambda theta,x_: tc.outer(self.grad_theta(theta,x_),self.grad_theta(theta,x_))
+        M=vmap((out_p),in_dims=(None,0))(theta,x).detach()
+        return tc.mean(M,dim=0)
+    
     
     def __call__(self, x):
         return self.forward(x)
@@ -111,3 +128,4 @@ def dx(f: Ansatz, x: torch.Tensor = None, order: int = 1) -> torch.Tensor:
             retain_graph=True,
         )[0]
     return df_value 
+
