@@ -26,7 +26,7 @@ class Ansatz(tc.nn.Module):
         
         # Dictionary of models 
         methods = {
-            'gaussian'        : self.gaussian_x,   # Eq. (16)
+            'gaussian'        : self.gaussian_x,
         }
 
         self.Theta = tc.rand(self.s,requires_grad=True) #if theta is None else theta
@@ -97,3 +97,17 @@ if __name__ == '__main__':
     plt.plot(mesh_x.detach(), y_true.detach(),'r:', lw=5)
     plt.grid()
     plt.show()
+    
+# compute the derivative
+def dx(f: Ansatz, x: torch.Tensor = None, order: int = 1) -> torch.Tensor:
+    """Compute neural network derivative with respect to input features using PyTorch autograd engine"""
+    df_value = f(x)
+    for _ in range(order):
+        df_value = torch.autograd.grad(
+            df_value,
+            x,
+            grad_outputs=torch.ones_like(x),
+            create_graph=True,
+            retain_graph=True,
+        )[0]
+    return df_value 
