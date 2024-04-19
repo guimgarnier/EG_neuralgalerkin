@@ -36,9 +36,9 @@ class Ansatz(tc.nn.Module):
         self.forward   = vmap(self.eval_x)
         
     def splitter_gaussian(self):
-        c = self.Theta[:self.m]
-        b = self.Theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
-        w = self.Theta[self.m+self.m*self.d:]
+        c = self.theta[:self.m]
+        b = self.theta[self.m: self.m+self.m*self.d ].reshape(self.m,self.d)
+        w = self.theta[self.m+self.m*self.d:]
         return (c,b,w)
     
     def gaussian_x(self, x: tc.Tensor):

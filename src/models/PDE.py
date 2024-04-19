@@ -14,7 +14,7 @@ class KdV(PDE):
     super().__init__()
     self.lamb = 6
    
-  def f(self, t, X, u):
+  def f(self, X, u, t=0):
     """
     Input:
     - X is a **vector** of points
